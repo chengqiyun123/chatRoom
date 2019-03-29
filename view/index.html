@@ -1,0 +1,218 @@
+<!-- 
+  @Author: chengqiyun 
+  @Date: 2019-03-29 19:14:21 
+  @Last Modified by:   chengqiyun 
+  @Last Modified time: 2019-03-29 19:14:21 
+  -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="https://cdn.bootcss.com/socket.io/2.2.0/socket.io.js"></script>
+    <script src="https://cdn.bootcss.com/vue/2.6.10/vue.js"></script>
+    <style>
+        *{
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+        ul li{
+            padding-left: 10px;
+        }
+        html,body,.wrap{
+            width: 100%;
+            height: 100%;
+        }
+        .login-box{
+            padding: 50px;
+            box-sizing: border-box;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: #333;
+            display: flex;
+            align-items: center;
+        }
+        .login-box #user{
+            padding: 0 10px;
+            box-sizing: border-box;
+            flex: 1;
+            height: 50px;
+            border: 0;
+            font-size: 18px;
+        }
+        .login-box #login{
+            padding: 0 20px;
+            height: 50px;
+            border: 0;
+        }
+        .container{
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .container .header{
+            width: 100%;
+            height: 50px;
+            line-height: 50px;
+            text-align: center;
+            border-bottom: 1px solid #999;
+        }
+        .container .chatRoom{
+            width:100%;
+            flex: 1;
+        }
+
+        .chatRoom{
+            display: flex;
+        }
+        .chatRoom .chat-left{
+            flex: 1;
+            min-width: 300px;
+            height: 100%;
+            border-right: 2px solid #999;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-left .chats{
+            padding: 0 10px;
+            box-sizing: border-box;
+            flex: 1;
+            width: 100%;
+            border-bottom: 2px solid #999;
+        }
+        .hint{
+            width: 100%;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+            background: #eee;
+            color: #999;
+        }
+        .chat-left .chat-ipt{
+            width: 100%;
+            height: 40px;
+            display: flex;
+        }
+        .chat-left .chat-ipt input{
+            padding: 0 10px;
+            box-sizing: border-box;
+            flex: 1;
+            height: 100%;
+            border: 0;
+        }
+        .chat-left .chat-ipt button{
+            padding: 0 20px;
+            height: 100%;
+            border: 1px solid #eee;
+            background: #333;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .chatRoom .chat-right{
+            width: 200px;
+            min-width: 200px;
+            height: 100%;
+        }
+        .l{
+            text-align: left;
+        }
+        .r{
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="container">
+            <div class="header">心灵鸡汤聊天室</div>
+            <div class="chatRoom">
+                <div class="chat-left">
+                    <div class="chats">
+                        <p class="hint">{{currUser}}</p>
+                        <ul>
+                            <li v-for="(val,index) in dialog" :key='index'>
+                                <p :class="val.user==user?'r': 'l'"> {{val.user}}-{{val.sendval}}</p>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="chat-ipt">
+                        <input @keyup.enter="onSubmit" type="text" placeholder="请输入你的内容" v-model='sendval'/>
+                        <button @click='send'>发送</button>
+                        <button @click='loginout'>退出</button>
+                    </div>
+                </div>
+                <div class="chat-right">
+                    <ul>
+                        <li v-for="(val,index) in userlist" :key='index'>{{val}}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="login-box" v-show='showlogin'>
+            <input id='user' placeholder='请输入你的大名' v-model="user"/>
+            <button id='login' @click='loginBtn'>登录</button>
+        </div>
+    </div>
+    <script>
+        new Vue({
+            el: '.wrap',
+            data: {
+                showlogin: true,
+                user: '',
+                userlist: [],
+                currUser: '',
+                sendval: '',
+                dialog: []
+            },
+            created(){
+                this.socket = io('ws://192.168.2.191:8000',{
+                    autoConnect: false
+                })
+            },
+            methods:{
+                loginBtn(){//点击登录
+                    this.socket.open();
+                    let val = this.user.trim();
+                    if(!val) return;
+                    this.socket.emit('login',val);
+                    this.socket.on('user-login',user=>{
+                        this.userlist = [...user.lists];
+                        this.currUser = `${user.user} income room`;
+                    })
+                    this.socket.on('sendvals',data=>{
+                        this.dialog = [...this.dialog,data]
+                    })
+                    this.showlogin = false;
+                },
+                loginout(){//点击退出
+                    this.socket.emit('loginout',this.user)
+                    this.socket.on('user-loginout',user=>{
+                        this.userlist = [...user.lists];
+                        this.currUser = `${user.user} leave room`;
+                    })
+                    this.showlogin = true;
+                },
+                send(){//点击发送
+                    if(!this.sendval) {alert('你还没输入内容');return;}
+                    this.socket.emit('sendval',{user:this.user,sendval:this.sendval})
+                    this.sendval = '';
+                },
+                onSubmit(){
+                    if(!this.sendval) {alert('你还没输入内容');return;}
+                    this.socket.emit('sendval',{user:this.user,sendval:this.sendval})
+                    this.sendval = '';
+                }
+            }
+        })
+        
+    </script>
+</body>
+</html>
